@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import TheWelcome from '../components/TheWelcome.vue'
+import SerialMonitor from '@/components/SerialMonitor.vue'
 </script>
 
 <template>
-  <main>
-    <TheWelcome />
-  </main>
+  <SerialMonitor />
 </template>
