@@ -10,26 +10,26 @@ const connection = useConnectionStore()
     <header>
       <h1 class="green">Serial Monitor</h1>
       <button
-        v-if="!connection.id || connection.physicallyConnected"
-        @click="connection.selectPort"
+        v-if="!connection.activePort || !connection.physicallyConnected"
+        @click="connection.selectPort()"
       >
         Select serial port
       </button>
-      <button v-else>Ping the Port</button>
+      <button
+        v-else-if="connection.activePort && connection.physicallyConnected"
+        @click="connection.connectToPort()"
+      >
+        Start streaming
+      </button>
     </header>
     <div></div>
     <body class="console">
       <consoleItem />
     </body>
-    <div id="terminal"></div>
   </div>
 </template>
 
 <style scoped>
-#terminal {
-  height: 90vh;
-}
-
 header {
   margin-top: 1rem;
   display: flex;

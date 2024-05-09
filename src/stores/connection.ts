@@ -1,24 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+
 import { serial as polyfill, SerialPort as SerialPortPolyfill } from 'web-serial-polyfill'
 
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
-import { WebLinksAddon } from 'xterm-addon-web-links'
-import 'xterm/css/xterm.css'
-
-const bufferSize = 1024
-
-const term = new Terminal({
-  scrollback: 10_000
-})
-const fitAddon = new FitAddon()
-term.loadAddon(fitAddon)
-
-term.loadAddon(new WebLinksAddon())
-
 const encoder = new TextEncoder()
-let toFlush = ''
+const decoder = new TextDecoder()
+const toFlush = ''
 
 export const useConnectionStore = defineStore('connection', () => {
   const id = ref<string | undefined>()
@@ -30,7 +17,7 @@ export const useConnectionStore = defineStore('connection', () => {
   const _reader = ref<ReadableStreamDefaultReader | ReadableStreamBYOBReader | undefined>()
   const comConfig = <SerialOptions>{
     baudRate: 115200,
-    bufferSize: 255,
+    bufferSize: 1024,
     dataBits: 8,
     flowControl: undefined,
     parity: undefined,
@@ -44,29 +31,6 @@ export const useConnectionStore = defineStore('connection', () => {
   const prepend = ''
   const append = '\n'
 
-  term.onData((data) => {
-    term.write(data)
-
-    if (activePort.value?.writable == null) {
-      console.warn(`unable to find writable port`)
-      return
-    }
-
-    const writer = activePort.value.writable.getWriter()
-
-    // eslint-disable-next-line no-constant-condition
-    if (true) {
-      toFlush += data
-      if (data === '\r') {
-        writer.write(encoder.encode(toFlush))
-        writer.releaseLock()
-        toFlush = ''
-      }
-    }
-
-    writer.releaseLock()
-  })
-
   async function selectPort() {
     console.log('connection.ts -> selectPort started')
 
@@ -76,13 +40,12 @@ export const useConnectionStore = defineStore('connection', () => {
       const selection = await navigator.serial
         .requestPort(requestOption)
         .then(async (port: SerialPort) => {
-          vendor.value = (await port).getInfo().usbVendorId
-          product.value = (await port).getInfo().usbProductId
           activePort.value = port
           return port
         })
       activePort.value = selection
-      console.log('Selected board from: ', vendor.value, product.value)
+      //console.log('Selected board: ', activePort.value.getInfo())
+      physicallyConnected.value = true
     } catch (e) {
       console.log("Couldn't request port")
       return
@@ -93,25 +56,60 @@ export const useConnectionStore = defineStore('connection', () => {
    * Initiates a connection to the selected port.
    */
   async function connectToPort(): Promise<void> {
+    const localTag: String = 'connectToPort'
     if (!activePort.value) {
+      console.log(localTag, 'activePort undefined')
       return
     }
 
     try {
       await activePort.value.open(comConfig)
-      term.writeln('<CONNECTED>')
+      console.log(localTag, '<Port opened>')
       // connectButton.textContent = 'Disconnect'
       // connectButton.disabled = false
     } catch (e) {
       console.error(e)
-      if (e instanceof Error) {
-        term.writeln(`<ERROR: ${e.message}>`)
-      }
       $reset()
       return
     }
-
+    console.log(localTag, 'while cycle reached')
     while (activePort.value && activePort.value.readable) {
+      const reader = activePort.value.readable.getReader()
+      let chunks = ''
+      const raw_chunks = []
+
+      try {
+        for (;;) {
+          const { value, done } = await reader.read()
+          const decoded = decoder.decode(value)
+
+          chunks += decoded
+          raw_chunks.push(value)
+
+          if (done || decoded.includes('\n')) {
+            console.log('Reading done.')
+            reader.releaseLock()
+            break
+          }
+        }
+      } catch (error) {
+        console.error(error)
+        throw error
+      } finally {
+        reader.releaseLock()
+      }
+
+      try {
+        //console.log(localTag, chunks)
+        //console.log(localTag, raw_chunks)
+        const parsed_chunk = JSON.parse(chunks.replace('\0', ''))
+        console.log(parsed_chunk)
+      } catch (error) {
+        console.log('JSON parse error')
+        console.log(error)
+      }
+
+      /*
       try {
         try {
           _reader.value = activePort.value.readable.getReader({ mode: 'byob' })
@@ -145,6 +143,7 @@ export const useConnectionStore = defineStore('connection', () => {
               term.write(value, resolve)
             })
           }
+          console.log(localTag, 'pos3', done, decoder.decode(value))
           if (done) {
             break
           }
@@ -162,6 +161,7 @@ export const useConnectionStore = defineStore('connection', () => {
           _reader.value = undefined
         }
       }
+      */
     }
 
     if (activePort.value) {
@@ -169,9 +169,6 @@ export const useConnectionStore = defineStore('connection', () => {
         await activePort.value.close()
       } catch (e) {
         console.error(e)
-        if (e instanceof Error) {
-          term.writeln(`<ERROR: ${e.message}>`)
-        }
       }
 
       $reset()
@@ -179,7 +176,6 @@ export const useConnectionStore = defineStore('connection', () => {
   }
 
   function $reset(): void {
-    term.writeln('<DISCONNECTED>')
     id.value = undefined
     vendor.value = undefined
     product.value = undefined // unsigned short integer
@@ -188,92 +184,6 @@ export const useConnectionStore = defineStore('connection', () => {
     open.value = false
     _reader.value = undefined
   }
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    const terminalElement = document.getElementById('terminal')
-    if (terminalElement) {
-      term.open(terminalElement)
-      fitAddon.fit()
-
-      window.addEventListener('resize', () => {
-        fitAddon.fit()
-      })
-    }
-    /*
-    
-    portSelector = document.getElementById('ports') as HTMLSelectElement;
-    
-    connectButton = document.getElementById('connect') as HTMLButtonElement;
-    connectButton.addEventListener('click', () => {
-      if (port) {
-        disconnectFromPort();
-      } else {
-        connectToPort();
-      }
-    });
-    
-    baudRateSelector = document.getElementById('baudrate') as HTMLSelectElement;
-    baudRateSelector.addEventListener('input', () => {
-      if (baudRateSelector.value == 'custom') {
-        customBaudRateInput.hidden = false;
-      } else {
-        customBaudRateInput.hidden = true;
-      }
-    });
-    
-    customBaudRateInput =
-    document.getElementById('custom_baudrate') as HTMLInputElement;
-    dataBitsSelector = document.getElementById('databits') as HTMLSelectElement;
-    paritySelector = document.getElementById('parity') as HTMLSelectElement;
-    stopBitsSelector = document.getElementById('stopbits') as HTMLSelectElement;
-    flowControlCheckbox = document.getElementById('rtscts') as HTMLInputElement;
-    echoCheckbox = document.getElementById('echo') as HTMLInputElement;
-    flushOnEnterCheckbox =
-    document.getElementById('enter_flush') as HTMLInputElement;
-    autoconnectCheckbox =
-    document.getElementById('autoconnect') as HTMLInputElement;
-    
-    const convertEolCheckbox =
-    document.getElementById('convert_eol') as HTMLInputElement;
-    const convertEolCheckboxHandler = () => {
-      term.options.convertEol = convertEolCheckbox.checked;
-    };
-    convertEolCheckbox.addEventListener('change', convertEolCheckboxHandler);
-    convertEolCheckboxHandler();
-    
-    const polyfillSwitcher =
-    document.getElementById('polyfill_switcher') as HTMLAnchorElement;
-    if (usePolyfill) {
-      polyfillSwitcher.href = './';
-      polyfillSwitcher.textContent = 'Switch to native API';
-    } else {
-      polyfillSwitcher.href = './?polyfill';
-      polyfillSwitcher.textContent = 'Switch to API polyfill';
-    }
-    */
-
-    const serial = usePolyfill ? polyfill : navigator.serial
-    const ports: (SerialPort | SerialPortPolyfill)[] = await serial.getPorts()
-    ports.forEach((port) => addNewPort(port))
-
-    // These events are not supported by the polyfill.
-    // https://github.com/google/web-serial-polyfill/issues/20
-    if (!usePolyfill) {
-      navigator.serial.addEventListener('connect', (event) => {
-        const portOption = addNewPort(event.target as SerialPort)
-        if (autoconnectCheckbox.checked) {
-          portOption.selected = true
-          connectToPort()
-        }
-      })
-      navigator.serial.addEventListener('disconnect', (event) => {
-        const portOption = findPortOption(event.target as SerialPort)
-        if (portOption) {
-          portOption.remove()
-        }
-      })
-    }
-  })
 
   return {
     _reader,
