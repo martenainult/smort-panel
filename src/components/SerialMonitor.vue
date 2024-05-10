@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import consoleItem from '@/components/ConsoleItem.vue'
 import { useConnectionStore } from '@/stores/connection'
+import { useDeviceStore } from '@/stores/devices'
 
 const connection = useConnectionStore()
 </script>
@@ -15,16 +16,16 @@ const connection = useConnectionStore()
       >
         Select serial port
       </button>
-      <button
-        v-else-if="connection.activePort && connection.physicallyConnected"
-        @click="connection.connectToPort()"
-      >
+      <button v-else-if="connection.open" @click="connection.disconnectPort()">
+        Disconnect port
+      </button>
+      <button v-else-if="connection.activePort" @click="connection.connectToPort()">
         Start streaming
       </button>
     </header>
     <div></div>
     <body class="console">
-      <consoleItem />
+      <consoleItem :com-port="connection.vendor?.toString()" />
     </body>
   </div>
 </template>

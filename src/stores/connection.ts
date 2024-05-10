@@ -2,12 +2,13 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { serial as polyfill, SerialPort as SerialPortPolyfill } from 'web-serial-polyfill'
+import { sanitizeJSON } from '@/tools'
+import { useDeviceStore } from './devices'
 
-const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-const toFlush = ''
 
 export const useConnectionStore = defineStore('connection', () => {
+  const devices = useDeviceStore()
   const id = ref<string | undefined>()
   const vendor = ref<number | undefined>() // unsigned short integer
   const product = ref<number | undefined>() // unsigned short integer
@@ -57,6 +58,7 @@ export const useConnectionStore = defineStore('connection', () => {
    */
   async function connectToPort(): Promise<void> {
     const localTag: String = 'connectToPort'
+    console.log(localTag, 'Start connecting to port')
     if (!activePort.value) {
       console.log(localTag, 'activePort undefined')
       return
@@ -65,22 +67,24 @@ export const useConnectionStore = defineStore('connection', () => {
     try {
       await activePort.value.open(comConfig)
       console.log(localTag, '<Port opened>')
-      // connectButton.textContent = 'Disconnect'
-      // connectButton.disabled = false
+      const portInfo = activePort.value.getInfo()
+      vendor.value = portInfo.usbVendorId
+      product.value = portInfo.usbProductId
+      open.value = true
     } catch (e) {
       console.error(e)
       $reset()
       return
     }
     console.log(localTag, 'while cycle reached')
-    while (activePort.value && activePort.value.readable) {
-      const reader = activePort.value.readable.getReader()
+    while (activePort.value && activePort.value.readable && open.value) {
+      _reader.value = activePort.value.readable.getReader()
       let chunks = ''
       const raw_chunks = []
 
       try {
-        for (;;) {
-          const { value, done } = await reader.read()
+        while (open.value) {
+          const { value, done } = await _reader.value.read()
           const decoded = decoder.decode(value)
 
           chunks += decoded
@@ -88,7 +92,8 @@ export const useConnectionStore = defineStore('connection', () => {
 
           if (done || decoded.includes('\n')) {
             console.log('Reading done.')
-            reader.releaseLock()
+            _reader.value.releaseLock()
+            if (!open.value) return
             break
           }
         }
@@ -96,72 +101,23 @@ export const useConnectionStore = defineStore('connection', () => {
         console.error(error)
         throw error
       } finally {
-        reader.releaseLock()
+        _reader.value.releaseLock()
       }
 
       try {
         //console.log(localTag, chunks)
         //console.log(localTag, raw_chunks)
-        const parsed_chunk = JSON.parse(chunks.replace('\0', ''))
+        const parsed_chunk = JSON.parse(sanitizeJSON(chunks))
         console.log(parsed_chunk)
+        if (parsed_chunk.event == 'answer') {
+          console.log('updateAnswer')
+          devices.updateAnswer(parsed_chunk)
+        }
       } catch (error) {
         console.log('JSON parse error')
         console.log(error)
+        _reader.value.releaseLock()
       }
-
-      /*
-      try {
-        try {
-          _reader.value = activePort.value.readable.getReader({ mode: 'byob' })
-        } catch {
-          _reader.value = activePort.value.readable.getReader()
-        }
-
-        let buffer = null
-        if (_reader.value == undefined) {
-          console.log('Reader undefined!')
-          return
-        }
-        for (;;) {
-          const { value, done } = await (async () => {
-            if (_reader.value instanceof ReadableStreamBYOBReader) {
-              if (!buffer) {
-                buffer = new ArrayBuffer(bufferSize)
-              }
-              const { value, done } = await _reader.value.read(
-                new Uint8Array(buffer, 0, bufferSize)
-              )
-              buffer = value?.buffer
-              return { value, done }
-            } else {
-              return await _reader.value.read()
-            }
-          })()
-
-          if (value) {
-            await new Promise<void>((resolve) => {
-              term.write(value, resolve)
-            })
-          }
-          console.log(localTag, 'pos3', done, decoder.decode(value))
-          if (done) {
-            break
-          }
-        }
-      } catch (e) {
-        console.error(e)
-        await new Promise<void>((resolve) => {
-          if (e instanceof Error) {
-            term.writeln(`<ERROR: ${e.message}>`, resolve)
-          }
-        })
-      } finally {
-        if (_reader.value) {
-          _reader.value.releaseLock()
-          _reader.value = undefined
-        }
-      }
-      */
     }
 
     if (activePort.value) {
@@ -175,14 +131,36 @@ export const useConnectionStore = defineStore('connection', () => {
     }
   }
 
-  function $reset(): void {
+  function disconnectPort() {
+    if (activePort.value && open.value) {
+      try {
+        console.log('Starting port disconnection')
+        $reset()
+      } catch (error) {
+        console.log(error)
+      }
+    }
+  }
+
+  async function $reset(): Promise<void> {
     id.value = undefined
     vendor.value = undefined
     product.value = undefined // unsigned short integer
-    activePort.value = undefined
     physicallyConnected.value = false
     open.value = false
-    _reader.value = undefined
+    if (_reader.value) {
+      await _reader.value.cancel()
+      _reader.value = undefined
+    }
+    if (activePort.value) {
+      try {
+        await activePort.value.close()
+      } catch (e) {
+        console.log(e)
+      }
+    }
+
+    activePort.value = undefined
   }
 
   return {
@@ -200,6 +178,7 @@ export const useConnectionStore = defineStore('connection', () => {
     vendor,
     close,
     connectToPort,
+    disconnectPort,
     selectPort,
     $reset
   }

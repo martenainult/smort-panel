@@ -1,15 +1,27 @@
 <script setup lang="ts">
+import deviceItem from '@/components/DeviceItem.vue'
+
+import { useDeviceStore } from '@/stores/devices'
+
+const deviceStore = useDeviceStore()
+
 defineProps<{
   comPort?: string
-  comContent?: string
 }>()
 </script>
 
 <template>
   <header>Connected to - {{ comPort ? comPort : 'None' }}</header>
-  <body id="frame">
-    <div class="serialFrame">asd</div>
-  </body>
+  <button v-if="comPort" @click="deviceStore.submitAnswers">Submit answers</button>
+  <div class="deviceBlock">
+    <deviceItem
+      class="device"
+      v-for="device in deviceStore.getDevices"
+      :key="device"
+      :id="device['s_mac']"
+      :option="device['opt']"
+    />
+  </div>
 </template>
 
 <style scoped>
@@ -18,11 +30,17 @@ header {
   font-size: 1rem;
 }
 
-body#frame {
-  width: 60%;
-  height: 50px;
-  background-color: rgb(46, 46, 46);
-  border-color: var(--color-border);
+button {
+  margin: 1rem;
+}
+
+div.deviceBlock {
+  display: flex wrap;
+  flex-direction: row;
+  width: 100%;
+  padding-top: 1rem;
+  background-color: rgb(32, 32, 32);
+  min-height: 600px;
   padding: 1rem;
 }
 
