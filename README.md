@@ -14,6 +14,9 @@ Although the Web Serial API isn’t compatible with firefox, Safari and mobile d
 
 ![alt text](image-1.png)
 
+## ESP32 Based Mesh Network Solution for Managing Practical Lessons (ESP-IDF)
+[Source code fore ESP32 devices](https://github.com/martenainult/esp-mesh-lite-smort-network/tree/main)
+
 ## Initialization
 
 Tested on Node.js v20.12.2
