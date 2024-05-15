@@ -21,6 +21,11 @@ const router = createRouter({
       path: '/serial-monitor',
       name: 'serial monitor',
       component: () => import('../views/SerialView.vue')
+    },
+    {
+      path: '/results',
+      name: 'results',
+      component: () => import('../views/ResultsView.vue')
     }
   ]
 })

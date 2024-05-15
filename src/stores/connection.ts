@@ -1,3 +1,5 @@
+// Parts were reused from the project of https://github.com/williamkapke/webserial/blob/main/src/stores/connection.js
+
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -5,6 +7,7 @@ import { serial as polyfill, SerialPort as SerialPortPolyfill } from 'web-serial
 import { sanitizeJSON } from '@/tools'
 import { useDeviceStore } from './devices'
 
+const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 export const useConnectionStore = defineStore('connection', () => {
@@ -46,10 +49,24 @@ export const useConnectionStore = defineStore('connection', () => {
         })
       activePort.value = selection
       //console.log('Selected board: ', activePort.value.getInfo())
+      const portInfo = activePort.value.getInfo()
       physicallyConnected.value = true
+      vendor.value = portInfo.usbVendorId
+      product.value = portInfo.usbProductId
     } catch (e) {
       console.log("Couldn't request port")
       return
+    }
+  }
+
+  async function write(data: string) {
+    if (activePort.value?.writable) {
+      const writer = activePort.value.writable.getWriter()
+      await writer.write(encoder.encode(data))
+      writer.releaseLock()
+      console.log('PING from host')
+    } else {
+      console.log('Unable to write to serial USB')
     }
   }
 
@@ -77,21 +94,41 @@ export const useConnectionStore = defineStore('connection', () => {
       return
     }
     console.log(localTag, 'while cycle reached')
+    let multisample_start = ''
     while (activePort.value && activePort.value.readable && open.value) {
       _reader.value = activePort.value.readable.getReader()
       let chunks = ''
       const raw_chunks = []
+      if (multisample_start != '') {
+        chunks = multisample_start
+        multisample_start = ''
+        //console.log('CHUNKS: ', chunks)
+      }
 
       try {
         while (open.value) {
           const { value, done } = await _reader.value.read()
           const decoded = decoder.decode(value)
 
+          if (decoded.includes('\n{')) {
+            // Handle the beginning of next JSON read
+            // console.log('Handling extra information')
+            //console.log(decoded)
+            multisample_start = decoded.substring(decoded.indexOf('{'))
+            chunks += decoded.substring(0, decoded.indexOf('\n'))
+            raw_chunks.push(value)
+            _reader.value.releaseLock()
+            //console.log('Handled json', chunks)
+            if (!open.value) return
+            break
+          }
+
           chunks += decoded
           raw_chunks.push(value)
 
           if (done || decoded.includes('\n')) {
-            console.log('Reading done.')
+            //console.log('Reading done.')
+            // console.log(raw_chunks)
             _reader.value.releaseLock()
             if (!open.value) return
             break
@@ -108,10 +145,21 @@ export const useConnectionStore = defineStore('connection', () => {
         //console.log(localTag, chunks)
         //console.log(localTag, raw_chunks)
         const parsed_chunk = JSON.parse(sanitizeJSON(chunks))
-        console.log(parsed_chunk)
+        // console.log(parsed_chunk)
+
+        switch (parsed_chunk.event) {
+          case 'answer':
+            devices.updateAnswer(parsed_chunk)
+            break
+          case 'sensor':
+            devices.updateSensor(parsed_chunk)
+            break
+          case 'ping':
+            devices.handlePong(parsed_chunk)
+            break
+        }
         if (parsed_chunk.event == 'answer') {
           console.log('updateAnswer')
-          devices.updateAnswer(parsed_chunk)
         }
       } catch (error) {
         console.log('JSON parse error')
@@ -180,6 +228,7 @@ export const useConnectionStore = defineStore('connection', () => {
     connectToPort,
     disconnectPort,
     selectPort,
+    write,
     $reset
   }
 })

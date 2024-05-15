@@ -1,18 +1,11 @@
 <script setup lang="ts">
 import deviceItem from '@/components/DeviceItem.vue'
-
 import { useDeviceStore } from '@/stores/devices'
 
 const deviceStore = useDeviceStore()
-
-defineProps<{
-  comPort?: string
-}>()
 </script>
 
 <template>
-  <header>Connected to - {{ comPort ? comPort : 'None' }}</header>
-  <button v-if="comPort" @click="deviceStore.submitAnswers">Submit answers</button>
   <div class="deviceBlock">
     <deviceItem
       class="device"
@@ -20,6 +13,9 @@ defineProps<{
       :key="device"
       :id="device['s_mac']"
       :option="device['opt']"
+      :sensor="device['temp']"
+      :level="device['lev']"
+      :ping="(device['pong'] - device['ping']).toString()"
     />
   </div>
 </template>
@@ -42,6 +38,7 @@ div.deviceBlock {
   background-color: rgb(32, 32, 32);
   min-height: 600px;
   padding: 1rem;
+  transform: 1s;
 }
 
 @media (min-width: 400px) {

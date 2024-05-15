@@ -3,6 +3,7 @@ import consoleItem from '@/components/ConsoleItem.vue'
 import { useConnectionStore } from '@/stores/connection'
 import { useDeviceStore } from '@/stores/devices'
 
+const deviceStore = useDeviceStore()
 const connection = useConnectionStore()
 </script>
 
@@ -22,6 +23,10 @@ const connection = useConnectionStore()
       <button v-else-if="connection.activePort" @click="connection.connectToPort()">
         Start streaming
       </button>
+      <button v-if="connection.open" @click="connection.write('ping'), deviceStore.setPing()">
+        Send 'PING'
+      </button>
+      <button @click="deviceStore.submitAnswers">Submit answers</button>
     </header>
     <div></div>
     <body class="console">
@@ -44,7 +49,6 @@ div button {
 button {
   height: 3rem;
   padding-left: 2rem;
-  padding-right: 2rem;
   border-radius: 1rem;
   background: none;
   color: var(--color-text);

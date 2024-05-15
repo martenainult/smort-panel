@@ -2,6 +2,9 @@
 defineProps<{
   id: string
   option: string
+  sensor?: string
+  level?: number
+  ping?: string
 }>()
 </script>
 
@@ -9,6 +12,8 @@ defineProps<{
   <div class="deviceBox">
     <div id="identifier">ID: {{ id }}</div>
     <div id="option">{{ option }}</div>
+    <div id="temperature">Layer: {{ level?.toString() }} - {{ sensor?.slice(0, 5) }}°C</div>
+    <div id="ping-pong">Ping: {{ ping }} ms</div>
   </div>
 </template>
 
@@ -16,11 +21,11 @@ defineProps<{
 div.deviceBox {
   display: inline-flex;
   flex-direction: column;
-  justify-content: center;
   text-align: center;
-  height: 80px;
+  height: 120px;
   width: 160px;
   margin: 4px;
+  padding-top: 8px;
   background-color: rgb(19, 19, 19);
   border-width: 2px;
   border-radius: 12px;
@@ -30,11 +35,14 @@ div.deviceBox {
 
   div#identifier {
     font-size: 12px;
-    height: 24px;
+    height: 30px;
   }
 
   div#option {
     font-size: 24px;
+    height: 100%;
+    color: hsla(160, 100%, 37%, 1);
+    transition: 1s;
   }
 }
 </style>

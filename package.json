@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@types/w3c-web-serial": "^1.0.6",
+    "chart.js": "^4.4.2",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",
+    "vue-chartjs": "^5.3.1",
     "vue-router": "^4.3.0",
     "web-serial-polyfill": "^1.0.15"
   },

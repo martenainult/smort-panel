@@ -14,7 +14,7 @@ import PageHeader from '@/components/PageHeader.vue'
 <style scoped>
 .mainframe {
   justify-content: center;
-  max-width: 80%;
+  max-width: 90%;
   margin-inline: auto;
 }
 </style>

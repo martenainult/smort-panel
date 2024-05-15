@@ -26,6 +26,7 @@
   --color-background: var(--vt-c-white);
   --color-background-soft: var(--vt-c-white-soft);
   --color-background-mute: var(--vt-c-white-mute);
+  --color-background-dark: rgb(32, 32, 32);
 
   --color-border: var(--vt-c-divider-light-2);
   --color-border-hover: var(--vt-c-divider-light-1);
@@ -56,6 +57,15 @@
   box-sizing: border-box;
   margin: 0;
   font-weight: normal;
+}
+
+.clickable {
+  cursor: pointer;
+  background-color: var(--color-background-dark);
+}
+
+.clickable:hover {
+  background-color: hsla(160, 100%, 37%, 0.2);
 }
 
 body {
