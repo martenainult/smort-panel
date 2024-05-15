@@ -13,3 +13,27 @@ Although the Web Serial API isn’t compatible with firefox, Safari and mobile d
 ## The Results view showcasing submitted answers by the user
 
 ![alt text](image-1.png)
+
+## Initialization
+
+Tested on Node.js v20.12.2
+
+~~~
+smort-man> npm i
+
+smort-man> npm run dev
+
+> smort-man@0.0.1 dev
+> vite
+
+
+  VITE v5.2.8  ready in 686 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  Vue DevTools: Open http://localhost:5173/__devtools__/ as a separate window
+  ➜  Vue DevTools: Press Alt(⌥)+Shift(⇧)+D in App to toggle the Vue DevTools
+
+  ➜  press h + enter to show help
+
+~~~
